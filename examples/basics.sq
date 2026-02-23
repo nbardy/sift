@@ -1,0 +1,6 @@
+;; ── Basics ───────────────────────────────────────────────────────
+;; Run: ag -f examples/basics.sq
+;; Or:  ag '(rg "ResultSet")'
+
+;; Find all ResultSet references in this repo
+(rg "ResultSet")

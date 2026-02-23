@@ -1,0 +1,8 @@
+;; ── Weighted Mix ────────────────────────────────────────────────
+;; (mix [w1 w2 ...] e1 e2 ...) blends with explicit weights.
+;; Higher weight = more influence on final ranking.
+;;
+;; Run: ag -f examples/weighted-mix.sq
+
+;; Prioritize struct definitions (70%) over trait definitions (30%)
+(top 10 (mix [0.7 0.3] (rg "pub struct") (rg "pub trait")))

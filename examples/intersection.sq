@@ -1,0 +1,7 @@
+;; ── Intersection ────────────────────────────────────────────────
+;; (&) returns only lines present in ALL child result sets.
+;;
+;; Run: ag -f examples/intersection.sq
+
+;; Lines that contain both "Result" AND "SqError"
+(& (rg "Result") (rg "SqError"))

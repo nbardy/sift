@@ -1,0 +1,8 @@
+;; ── Filters and Scoping ──────────────────────────────────────────
+;; :lang — file type   :in — directory scope
+;; :x    — exclude glob   :i — include glob
+;;
+;; Run: ag -f examples/filters.sq
+
+;; Find all Rust functions, excluding test code
+(- (rg "fn " :lang "rust") (rg "#\\[test\\]"))

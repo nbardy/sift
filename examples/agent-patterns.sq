@@ -1,0 +1,8 @@
+;; ── Agent Search Patterns ────────────────────────────────────────
+;; Patterns showing how AI agents can compose searches
+;; for sophisticated multi-step code analysis.
+;;
+;; Run: ag -f examples/agent-patterns.sq
+
+;; Find unwrap() calls in production code (exclude tests)
+(- (rg "unwrap\\(\\)" :lang "rust") (rg "#\\[test\\]|#\\[cfg\\(test\\)\\]"))

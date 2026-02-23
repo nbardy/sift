@@ -1,0 +1,11 @@
+;; ── Output Modes ────────────────────────────────────────────────
+;; Control how results render. Set in DSL or via CLI flags.
+;;
+;; ag '(files (rg "struct"))'        — paths only
+;; ag --scores '(rg "struct")'       — file:line [score] snippet
+;; ag --json '(rg "struct")'         — machine-readable
+;;
+;; Run: ag -f examples/output-modes.sq
+
+;; Default output: file:line  snippet
+(rg "pub struct")

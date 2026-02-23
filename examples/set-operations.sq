@@ -1,0 +1,8 @@
+;; ── Set Operations ───────────────────────────────────────────────
+;; Combinators compose results like sets.
+;; All fan out in parallel automatically.
+;;
+;; Run: ag -f examples/set-operations.sq
+
+;; Difference: find lines with "eval" that aren't the definition
+(- (rg "eval\\(") (rg "pub fn eval"))

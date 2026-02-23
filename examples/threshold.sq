@@ -1,0 +1,7 @@
+;; ── Score Threshold ─────────────────────────────────────────────
+;; (> t expr) keeps only hits with score >= t.
+;;
+;; Run: ag -f examples/threshold.sq
+
+;; High-confidence matches only (top of the ranking)
+(> 0.5 (rg "impl"))

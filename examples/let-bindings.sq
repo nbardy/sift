@@ -1,0 +1,8 @@
+;; ── Let Bindings ────────────────────────────────────────────────
+;; Name intermediate results to avoid duplication.
+;;
+;; Run: ag -f examples/let-bindings.sq
+
+;; Find public functions, then take top 5
+(let [fns (rg "pub fn" :lang "rust")]
+  (top 5 fns))

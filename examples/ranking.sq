@@ -1,0 +1,8 @@
+;; ── Ranking and Fusion ───────────────────────────────────────────
+;; mix blends results using Reciprocal Rank Fusion (RRF).
+;; Parallel by default — total time = slowest backend, not sum.
+;;
+;; Run: ag -f examples/ranking.sq
+
+;; Top 5 results from blending two searches across this repo
+(top 5 (mix (rg "fn ") (rg "pub struct")))

@@ -1,0 +1,7 @@
+;; ── Union ────────────────────────────────────────────────────────
+;; (|) returns lines present in ANY child result set. Best score wins.
+;;
+;; Run: ag -f examples/union.sq
+
+;; All error-related code: error types OR error handling
+(| (rg "Error") (rg "error"))
