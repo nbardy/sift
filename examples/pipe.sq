@@ -1,0 +1,9 @@
+;; ── Sequential Pipeline ──────────────────────────────────────────
+;; (pipe source target)
+;; Evaluates source first, then runs target only in files from source.
+;; This enables tiered/cascading search: narrow first, refine second.
+;;
+;; Run: ag -f examples/pipe.sq
+
+;; Find files with "struct", then search only those for "impl"
+(pipe (rg "pub struct") (rg "impl"))

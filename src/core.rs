@@ -86,15 +86,13 @@ pub enum Expr {
     Or(Vec<Expr>),
     Mix(Weights, Vec<Expr>),
     Diff(Box<Expr>, Box<Expr>),
+    /// Sequential pipeline: evaluate source, extract file paths, scope target to those paths.
+    /// (pipe source target) — e.g. (pipe (rg "auth") (rg "TODO"))
+    Pipe(Box<Expr>, Box<Expr>),
 
     // Filters
     Top(usize, Box<Expr>),
     Threshold(f64, Box<Expr>),
-
-    // Output
-    Files(Box<Expr>),
-    Scores(Box<Expr>),
-    Json(Box<Expr>),
 
     // Bindings
     Let(Vec<Binding>, Box<Expr>),

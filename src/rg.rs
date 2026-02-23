@@ -19,7 +19,8 @@ impl RgBackend {
 
         if let Some(lang) = &opts.lang {
             args.push("--type".to_string());
-            args.push(lang.clone());
+            // Canonicalize lang names so "py" → "python", "rs" → "rust", etc.
+            args.push(crate::util::rg_type_name(lang).to_string());
         }
 
         for glob in &opts.exclude {

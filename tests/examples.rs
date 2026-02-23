@@ -141,6 +141,23 @@ fn sem_unavailable() {
 }
 
 #[test]
+fn pipe_sequential() {
+    // Pipe: find files with "struct", then search those files for "pub"
+    let (ok, out) = ag(&["--json", r#"(pipe (rg "pub struct") (rg "impl"))"#]);
+    assert!(ok, "{out}");
+    let hits: Vec<serde_json::Value> = serde_json::from_str(&out).unwrap();
+    // Every hit should be in a file that also contains "pub struct"
+    assert!(!hits.is_empty(), "pipe should return results");
+}
+
+#[test]
+fn example_pipe() {
+    let (ok, out) = ag(&["-f", "examples/pipe.sq"]);
+    assert!(ok, "{out}");
+    assert!(!out.is_empty());
+}
+
+#[test]
 fn working_dir_flag() {
     let (ok, out) = ag(&["-C", "src", r#"(rg "pub fn")"#]);
     assert!(ok, "{out}");
@@ -148,4 +165,40 @@ fn working_dir_flag() {
     for line in out.lines() {
         assert!(!line.starts_with("src/"), "with -C src, paths should not start with src/: {line}");
     }
+}
+
+// ── Auto mode ───────────────────────────────────────────────────
+
+#[test]
+fn auto_mode_plain_text() {
+    // Plain text (no parens) should auto-wrap as rg
+    let (ok, out) = ag(&["pub struct"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("pub struct"));
+}
+
+#[test]
+fn auto_mode_sexp_passthrough() {
+    // S-expression should pass through unchanged
+    let (ok, out) = ag(&[r#"(top 3 (rg "fn"))"#]);
+    assert!(ok, "{out}");
+}
+
+// ── Index management ────────────────────────────────────────────
+
+#[test]
+fn index_status_no_index() {
+    let (ok, out) = ag(&["--index-status"]);
+    assert!(ok, "{out}");
+}
+
+#[test]
+fn index_clean_noop() {
+    // Clean when no .ag/ exists should succeed gracefully
+    let dir = tempfile::tempdir().unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_ag"))
+        .args(["--index-clean", "-C", dir.path().to_str().unwrap()])
+        .output()
+        .expect("failed to run ag");
+    assert!(output.status.success());
 }

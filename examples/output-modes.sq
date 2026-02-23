@@ -1,7 +1,7 @@
 ;; ── Output Modes ────────────────────────────────────────────────
-;; Control how results render. Set in DSL or via CLI flags.
+;; Control how results render via CLI flags:
 ;;
-;; ag '(files (rg "struct"))'        — paths only
+;; ag --files '(rg "struct")'        — paths only
 ;; ag --scores '(rg "struct")'       — file:line [score] snippet
 ;; ag --json '(rg "struct")'         — machine-readable
 ;;

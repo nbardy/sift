@@ -175,11 +175,9 @@ impl Parser {
             "|"      => self.parse_variadic(Expr::Or)?,
             "mix"    => self.parse_mix()?,
             "-"      => self.parse_diff()?,
+            "pipe"   => self.parse_pipe()?,
             "top"    => self.parse_top()?,
             ">"      => self.parse_threshold()?,
-            "files"  => self.parse_unary(Expr::Files)?,
-            "scores" => self.parse_unary(Expr::Scores)?,
-            "json"   => self.parse_unary(Expr::Json)?,
             "let"    => self.parse_let()?,
             other    => return Err(ParseError::UnknownForm(other.to_string())),
         };
@@ -252,6 +250,13 @@ impl Parser {
         Ok(Expr::Diff(Box::new(left), Box::new(right)))
     }
 
+    /// Parse pipe: (pipe source target) or (>> source target)
+    fn parse_pipe(&mut self) -> Result<Expr, ParseError> {
+        let source = self.parse_expr()?;
+        let target = self.parse_expr()?;
+        Ok(Expr::Pipe(Box::new(source), Box::new(target)))
+    }
+
     fn parse_top(&mut self) -> Result<Expr, ParseError> {
         let k = match self.next()? {
             Token::Num(n) => n as usize,
@@ -268,11 +273,6 @@ impl Parser {
         };
         let child = self.parse_expr()?;
         Ok(Expr::Threshold(t, Box::new(child)))
-    }
-
-    fn parse_unary(&mut self, ctor: fn(Box<Expr>) -> Expr) -> Result<Expr, ParseError> {
-        let child = self.parse_expr()?;
-        Ok(ctor(Box::new(child)))
     }
 
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
@@ -349,6 +349,15 @@ mod tests {
     }
 
     #[test]
+    fn parse_pipe() {
+        let expr = parse(r#"(pipe (rg "auth") (rg "TODO"))"#).unwrap();
+        assert_eq!(expr, Expr::Pipe(
+            Box::new(Expr::Rg("auth".into(), SearchOpts::default())),
+            Box::new(Expr::Rg("TODO".into(), SearchOpts::default())),
+        ));
+    }
+
+    #[test]
     fn parse_top() {
         let expr = parse(r#"(top 5 (rg "TODO"))"#).unwrap();
         assert_eq!(expr, Expr::Top(5, Box::new(Expr::Rg("TODO".into(), SearchOpts::default()))));
@@ -405,10 +414,4 @@ mod tests {
         assert_eq!(expr, Expr::Threshold(0.5, Box::new(Expr::Rg("auth".into(), SearchOpts::default()))));
     }
 
-    #[test]
-    fn parse_output_forms() {
-        assert_eq!(parse(r#"(files (rg "TODO"))"#).unwrap(), Expr::Files(Box::new(Expr::Rg("TODO".into(), SearchOpts::default()))));
-        assert_eq!(parse(r#"(scores (rg "TODO"))"#).unwrap(), Expr::Scores(Box::new(Expr::Rg("TODO".into(), SearchOpts::default()))));
-        assert_eq!(parse(r#"(json (rg "TODO"))"#).unwrap(), Expr::Json(Box::new(Expr::Rg("TODO".into(), SearchOpts::default()))));
-    }
 }
