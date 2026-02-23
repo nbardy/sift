@@ -1,4 +1,4 @@
-use crate::core::{Env, Expr, ResultSet, SearchBackend, SqError, Weights};
+use crate::core::{Env, EvalResult, Expr, LabeledResult, ResultSet, SearchBackend, SqError, Weights};
 use crate::rg::RgBackend;
 use std::future::Future;
 use std::path::PathBuf;
@@ -40,6 +40,42 @@ impl Ctx {
             cwd: self.cwd.clone(),
         }
     }
+}
+
+/// Top-level evaluator: dispatches Batch and Let-over-Batch, wraps everything else as Single.
+/// This is the entry point from main — `eval` stays pure ResultSet for inner expressions.
+pub fn eval_top<'a>(
+    expr: &'a Expr,
+    ctx: &'a Ctx,
+) -> Pin<Box<dyn Future<Output = Result<EvalResult, SqError>> + Send + 'a>> {
+    Box::pin(async move {
+        match expr {
+            Expr::Batch(entries) => {
+                let futures: Vec<_> = entries
+                    .iter()
+                    .map(|entry| {
+                        let label = entry.label.clone();
+                        async move {
+                            let result = eval(&entry.expr, ctx).await?;
+                            Ok::<LabeledResult, SqError>(LabeledResult { label, result })
+                        }
+                    })
+                    .collect();
+                let results = futures::future::join_all(futures).await;
+                let labeled: Vec<LabeledResult> = results.into_iter().collect::<Result<_, _>>()?;
+                Ok(EvalResult::Batch(labeled))
+            }
+            Expr::Let(bindings, body) => {
+                let mut inner_ctx = ctx.fork(ctx.env.clone());
+                for binding in bindings {
+                    let val = eval(&binding.value, &inner_ctx).await?;
+                    inner_ctx.env.insert(binding.name.clone(), val);
+                }
+                eval_top(body, &inner_ctx).await
+            }
+            _ => Ok(EvalResult::Single(eval(expr, ctx).await?)),
+        }
+    })
 }
 
 /// Evaluate an expression, returning a ResultSet.
@@ -111,6 +147,11 @@ pub fn eval<'a>(
                 eval(body, &inner_ctx).await
             }
 
+            // Batch is top-level only — eval_top handles it.
+            Expr::Batch(_) => Err(SqError::Other(
+                "batch can only appear at the top level".into(),
+            )),
+
             Expr::Var(name) => ctx
                 .env
                 .get(name)
@@ -163,6 +204,15 @@ fn scope_expr_to_files(expr: &Expr, files: &[String]) -> Expr {
                 Box::new(scope_expr_to_files(body, files)),
             )
         }
+        Expr::Batch(entries) => Expr::Batch(
+            entries
+                .iter()
+                .map(|e| crate::core::BatchEntry {
+                    label: e.label.clone(),
+                    expr: scope_expr_to_files(&e.expr, files),
+                })
+                .collect(),
+        ),
         Expr::Var(_) => expr.clone(),
     }
 }

@@ -32,6 +32,7 @@ Agents grep. Sometimes they grep well, sometimes they miss things. The gap betwe
 - **Ranked fusion** — [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) blends results from different backends into a single ranked list.
 - **Three backends** — `rg` (exact grep), `lex` (BM25 via tantivy), `sem` (embeddings via ONNX). Feature-gated so you only compile what you need.
 - **Sequential pipelines** — `(pipe source target)` runs source first, then scopes target to matching files.
+- **Named parallel batch** — `(batch :label1 e1 :label2 e2)` runs searches concurrently with labeled output. One call replaces many.
 - **Auto mode** — `ag "query"` without parens auto-wraps as ripgrep search.
 - **Single binary** — <2MB default, ~10MB with all features. No runtime, no config.
 
@@ -85,6 +86,10 @@ ag '(lex "connection pool")'
 # Semantic search (requires --features sem)
 ag '(sem "error handling and recovery")'
 
+# Named parallel batch — one call, labeled results
+ag '(batch :structs (rg "pub struct") :fns (rg "pub fn"))'
+ag '(batch {:top 5} :a (rg "TODO") :b (rg "FIXME"))'
+
 # Output modes
 ag --files '(rg "TODO")'              # paths only
 ag --json '(rg "TODO")'               # machine-readable
@@ -118,6 +123,7 @@ Every example searches this repo and is tested in CI.
 | [filters.sq](examples/filters.sq) | `:lang`, `:x` | File type + exclude filters |
 | [let-bindings.sq](examples/let-bindings.sq) | `let` | Named intermediate results |
 | [pipe.sq](examples/pipe.sq) | `pipe` | Sequential pipeline search |
+| [batch.sq](examples/batch.sq) | `batch` | Named parallel evaluation |
 | [agent-patterns.sq](examples/agent-patterns.sq) | combined | Multi-step agent strategies |
 | [output-modes.sq](examples/output-modes.sq) | output | files, scores, json rendering |
 
@@ -230,7 +236,8 @@ Regenerate: `./scripts/charts.sh`
 - [x] `lex` backend — tantivy BM25 indexing (feature-gated)
 - [x] `sem` backend — embedding similarity via ONNX (feature-gated)
 - [x] `ag --index` — build/manage indexes
-- [x] 55 tests (24 unit + 31 integration)
+- [x] `batch` — named parallel evaluation with labeled sections
+- [x] 63 tests (27 unit + 36 integration)
 - [ ] Streaming progressive output
 - [ ] `ag index --watch` — background index daemon
 - [ ] Tree-sitter aware chunking for sem backend

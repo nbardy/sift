@@ -3,7 +3,7 @@
 > See also: [Cheatsheet](cheatsheet.md) — dense single-page reference
 > See also: [Examples](../examples/) — runnable `.sq` files for every feature
 
-Sift is an S-expression DSL for composing search tools. Every expression evaluates to a `ResultSet` — a list of scored hits at specific file:line locations. The DSL has **12 forms**: 3 search primitives, 5 combinators, 2 filters, and let bindings.
+Sift is an S-expression DSL for composing search tools. Every expression evaluates to a `ResultSet` — a list of scored hits at specific file:line locations. The DSL has **13 forms**: 3 search primitives, 5 combinators, 2 filters, batch, and let bindings.
 
 ---
 
@@ -155,6 +155,81 @@ Keep only results with score >= threshold (0.0 to 1.0).
 ```bash
 ag '(> 0.5 (mix (sem "error handling") (rg "catch|rescue")))'
 ag '(> 0.8 (sem "security vulnerability"))'
+```
+
+---
+
+## Named Parallel: `batch`
+
+Run multiple independent searches in parallel and get labeled sections back. Each `:label expr` pair executes concurrently; results are grouped by label instead of merged.
+
+**Key difference from `|`/`mix`:** union and mix *fuse* results into one ranked list. Batch keeps them *separate* — you get labeled sections, not a merged set. Use batch when you want distinct answers to distinct questions, run in parallel.
+
+```bash
+# Named parallel searches
+ag '(batch :structs (rg "pub struct") :fns (rg "pub fn") :enums (rg "pub enum"))'
+
+# Shared options applied to every entry
+ag '(batch {:top 5} :todos (rg "TODO") :bugs (rg "FIXME") :debt (sem "technical debt"))'
+
+# Shared options: both :top and :> (threshold) supported
+ag '(batch {:top 10 :> 0.3} :a (rg "async") :b (rg "tokio"))'
+```
+
+### Batch Options
+
+The `{:top N :> T}` block is parser sugar — each entry expression is wrapped in `(top N ...)` and/or `(> T ...)`. These are equivalent:
+
+```bash
+ag '(batch {:top 5} :a (rg "x") :b (rg "y"))'
+ag '(batch :a (top 5 (rg "x")) :b (top 5 (rg "y")))'
+```
+
+### Output Formats
+
+**Default/Scores**: labeled sections with `── label ──` headers:
+```
+── structs ──
+src/core.rs
+     9  pub struct Hit {
+    19  pub struct Score(pub f64);
+
+── fns ──
+src/fusion.rs
+     9  pub fn rrf(sets: &[ResultSet]) -> ResultSet {
+```
+
+**JSON** (`--json`): a labeled dictionary:
+```json
+{ "structs": [...], "fns": [...] }
+```
+
+**Files** (`--files`): labeled sections of deduplicated paths.
+
+### Composing with `let`
+
+Batch composes with let bindings for complex multi-query analysis:
+
+```bash
+ag '(let [auth (rg "auth" :lang "rs")]
+  (batch
+    :callers  (- auth (rg "fn authenticate"))
+    :tests    (& auth (rg "test"))
+    :security (pipe auth (rg "unsafe|unwrap"))))'
+```
+
+### Agent Use Case
+
+Batch is designed for agents that need multiple searches answered in one call:
+
+```bash
+# Comprehensive codebase audit — one call, five parallel searches
+ag '(batch {:top 10}
+  :todos    (mix (rg "TODO|FIXME") (rg "HACK|WORKAROUND"))
+  :configs  (- (rg "learning_rate|lr.*=" :lang "py") (rg "test|mock"))
+  :training (pipe (rg "def train") (rg "loss"))
+  :logging  (& (rg "wandb|mlflow") (rg "loss|metric"))
+  :unsafe   (top 20 (- (rg "unsafe") (rg "// SAFETY"))))'
 ```
 
 ---

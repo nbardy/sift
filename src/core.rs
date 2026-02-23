@@ -94,9 +94,26 @@ pub enum Expr {
     Top(usize, Box<Expr>),
     Threshold(f64, Box<Expr>),
 
+    // Named parallel evaluation
+    Batch(Vec<BatchEntry>),
+
     // Bindings
     Let(Vec<Binding>, Box<Expr>),
     Var(String),
+}
+
+/// A named entry in a batch: label + expression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatchEntry {
+    pub label: String,
+    pub expr: Expr,
+}
+
+/// Batch-level options (parser sugar — desugared by wrapping each entry).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct BatchOpts {
+    pub top: Option<usize>,
+    pub threshold: Option<f64>,
 }
 
 /// Weights for mix: either equal (auto) or explicit.
@@ -119,6 +136,23 @@ pub enum OutputFormat {
     Files,
     Scores,
     Json,
+}
+
+// ── Eval result: single or batch ────────────────────────────────────
+
+/// The two shapes evaluation can produce.
+/// Single: one ResultSet (all forms except batch).
+/// Batch: labeled sections (the batch form).
+#[derive(Debug, Clone, Serialize)]
+pub enum EvalResult {
+    Single(ResultSet),
+    Batch(Vec<LabeledResult>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LabeledResult {
+    pub label: String,
+    pub result: ResultSet,
 }
 
 // ── Errors ──────────────────────────────────────────────────────────

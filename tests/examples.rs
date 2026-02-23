@@ -184,6 +184,53 @@ fn auto_mode_sexp_passthrough() {
     assert!(ok, "{out}");
 }
 
+// ── Batch ────────────────────────────────────────────────────────
+
+#[test]
+fn batch_labeled_sections() {
+    let (ok, out) = ag(&[r#"(batch :structs (rg "pub struct") :fns (rg "pub fn"))"#]);
+    assert!(ok, "{out}");
+    assert!(out.contains("── structs ──"), "batch should show struct label");
+    assert!(out.contains("── fns ──"), "batch should show fns label");
+}
+
+#[test]
+fn batch_json_dict() {
+    let (ok, out) = ag(&["--json", r#"(batch :a (rg "pub struct") :b (rg "pub fn"))"#]);
+    assert!(ok, "{out}");
+    let parsed: serde_json::Value = serde_json::from_str(&out)
+        .expect("batch --json must be valid JSON");
+    assert!(parsed.is_object(), "batch JSON should be an object, got: {parsed}");
+    assert!(parsed.get("a").is_some(), "batch JSON missing key 'a'");
+    assert!(parsed.get("b").is_some(), "batch JSON missing key 'b'");
+}
+
+#[test]
+fn batch_with_opts() {
+    let (ok, out) = ag(&["--json", r#"(batch {:top 2} :s (rg "pub struct") :f (rg "pub fn"))"#]);
+    assert!(ok, "{out}");
+    let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let s_hits = parsed["s"].as_array().unwrap();
+    let f_hits = parsed["f"].as_array().unwrap();
+    assert!(s_hits.len() <= 2, "batch top 2 should limit struct results, got {}", s_hits.len());
+    assert!(f_hits.len() <= 2, "batch top 2 should limit fn results, got {}", f_hits.len());
+}
+
+#[test]
+fn batch_let_composition() {
+    let (ok, out) = ag(&[r#"(let [x (rg "pub")] (batch :all (top 3 x) :structs (& x (rg "struct"))))"#]);
+    assert!(ok, "{out}");
+    assert!(out.contains("── all ──"));
+    assert!(out.contains("── structs ──"));
+}
+
+#[test]
+fn example_batch() {
+    let (ok, out) = ag(&["-f", "examples/batch.sq"]);
+    assert!(ok, "{out}");
+    assert!(!out.is_empty());
+}
+
 // ── Index management ────────────────────────────────────────────
 
 #[test]

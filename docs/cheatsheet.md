@@ -2,6 +2,32 @@
 
 Binary: `ag`. S-expression DSL. Every expression returns a `ResultSet`. All combinators run children in parallel.
 
+## Why This Is Fast
+
+Every combinator fans out children as parallel async tasks. A single `ag` call replaces multiple sequential searches:
+
+```bash
+# One call, five parallel searches, labeled results — replaces 5 sequential greps
+ag '(batch {:top 10}
+  :todos    (mix (rg "TODO|FIXME") (rg "HACK|WORKAROUND"))
+  :configs  (- (rg "learning_rate|lr.*=" :lang "py") (rg "test|mock"))
+  :training (pipe (rg "def train") (rg "loss"))
+  :logging  (& (rg "wandb|mlflow") (rg "loss|metric"))
+  :debt     (top 20 (mix (rg "TODO|FIXME") (sem "technical debt"))))'
+
+# Deep codebase audit in one shot
+ag -C /path/to/repo --scores '(top 30
+  (| (mix (rg "TODO|FIXME") (rg "bug|broken|regression"))
+     (- (rg "learning_rate|lr.*=" :lang "py") (rg "test|mock"))
+     (pipe (rg "def train") (rg "loss"))))'
+
+# Named parallel security scan
+ag '(batch
+  :creds    (top 10 (- (rg "SECRET|TOKEN|API_KEY") (rg "test|mock")))
+  :sql      (pipe (sem "authentication") (rg "format!.*SELECT"))
+  :unsafe   (& (rg "unsafe") (- (rg "unsafe") (rg "// SAFETY"))))'
+```
+
 ## Primitives
 
 ```bash
@@ -28,6 +54,21 @@ ag '(pipe e1 e2)'                   # sequential — run e1, scope e2 to those f
 ```bash
 ag '(top k e)'                       # top k by score
 ag '(> t e)'                         # score threshold >= t
+```
+
+## Batch (Named Parallel)
+
+```bash
+ag '(batch :label1 e1 :label2 e2)'   # parallel eval, labeled sections
+ag '(batch {:top 5} :a e1 :b e2)'    # shared opts applied to each entry
+ag --json '(batch :a e1 :b e2)'      # JSON: {"a": [...], "b": [...]}
+```
+
+Composes with `let`:
+```bash
+ag '(let [auth (rg "auth")]
+  (batch :callers (- auth (rg "fn auth"))
+         :tests   (& auth (rg "test"))))'
 ```
 
 ## Bindings
@@ -83,9 +124,9 @@ ag '(top 10 (mix (sem "entry point") (rg "fn main") (lex "main entry")))'
 ag '(let [auth (rg "auth" :lang "rs")] (top 5 (- auth (rg "test"))))'
 ```
 
-## 12 Forms Total
+## 13 Forms Total
 
-Primitives: `rg` `lex` `sem` | Combinators: `&` `|` `mix` `-` `pipe` | Filters: `top` `>` | Bindings: `let` + var refs
+Primitives: `rg` `lex` `sem` | Combinators: `&` `|` `mix` `-` `pipe` | Filters: `top` `>` | Parallel: `batch` | Bindings: `let` + var refs
 
 ## Backends
 

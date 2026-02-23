@@ -1,0 +1,7 @@
+; batch — named parallel evaluation
+; Each entry runs concurrently; results are labeled sections.
+
+(batch
+  :structs (top 5 (rg "pub struct"))
+  :enums   (top 5 (rg "pub enum"))
+  :traits  (top 5 (rg "pub trait")))

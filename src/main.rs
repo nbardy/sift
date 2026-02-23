@@ -12,7 +12,7 @@ mod util;
 use anyhow::{Context, Result};
 use clap::Parser;
 use colored::Colorize;
-use core::{OutputFormat, ResultSet};
+use core::{EvalResult, OutputFormat, ResultSet};
 #[cfg(any(feature = "lex", feature = "sem"))]
 use core::SearchBackend;
 use std::path::PathBuf;
@@ -89,9 +89,9 @@ async fn main() -> Result<()> {
 
     let format = resolve_format(&cli);
     let ctx = eval::Ctx::new(cwd);
-    let result = eval::eval(&expr, &ctx).await.map_err(|e| anyhow::anyhow!("{e}"))?;
+    let result = eval::eval_top(&expr, &ctx).await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    render(&result, format);
+    render_result(&result, format);
     Ok(())
 }
 
@@ -231,6 +231,13 @@ fn resolve_format(cli: &Cli) -> OutputFormat {
 
 // ── Output rendering ─────────────────────────────────────────────
 
+fn render_result(result: &EvalResult, format: OutputFormat) {
+    match result {
+        EvalResult::Single(rs) => render(rs, format),
+        EvalResult::Batch(sections) => render_batch(sections, format),
+    }
+}
+
 fn render(result: &ResultSet, format: OutputFormat) {
     match format {
         OutputFormat::Json => {
@@ -246,6 +253,41 @@ fn render(result: &ResultSet, format: OutputFormat) {
         }
         OutputFormat::Scores => render_scores(&result.hits),
         OutputFormat::Default => render_default(&result.hits),
+    }
+}
+
+fn render_batch(sections: &[core::LabeledResult], format: OutputFormat) {
+    match format {
+        OutputFormat::Json => {
+            let map: serde_json::Map<String, serde_json::Value> = sections
+                .iter()
+                .map(|s| {
+                    (
+                        s.label.clone(),
+                        serde_json::to_value(&s.result.hits).unwrap_or_default(),
+                    )
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&map).unwrap_or_default());
+        }
+        _ => {
+            for (i, section) in sections.iter().enumerate() {
+                if i > 0 { println!(); }
+                println!("{}", format!("── {} ──", section.label).cyan().bold());
+                match format {
+                    OutputFormat::Scores => render_scores(&section.result.hits),
+                    OutputFormat::Files => {
+                        let mut seen = std::collections::HashSet::new();
+                        for hit in &section.result.hits {
+                            if seen.insert(&hit.path) {
+                                println!("{}", hit.path.purple());
+                            }
+                        }
+                    }
+                    _ => render_default(&section.result.hits),
+                }
+            }
+        }
     }
 }
 

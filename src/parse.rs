@@ -1,4 +1,4 @@
-use crate::core::{Binding, Expr, SearchOpts, Weights};
+use crate::core::{BatchEntry, BatchOpts, Binding, Expr, SearchOpts, Weights};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
@@ -24,6 +24,8 @@ enum Token {
     Close,
     BracketOpen,
     BracketClose,
+    BraceOpen,
+    BraceClose,
     Str(String),
     Num(f64),
     Sym(String),
@@ -47,6 +49,8 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
             b')' => { tokens.push(Token::Close); i += 1; }
             b'[' => { tokens.push(Token::BracketOpen); i += 1; }
             b']' => { tokens.push(Token::BracketClose); i += 1; }
+            b'{' => { tokens.push(Token::BraceOpen); i += 1; }
+            b'}' => { tokens.push(Token::BraceClose); i += 1; }
             b'"' => {
                 i += 1;
                 let start = i;
@@ -178,6 +182,7 @@ impl Parser {
             "pipe"   => self.parse_pipe()?,
             "top"    => self.parse_top()?,
             ">"      => self.parse_threshold()?,
+            "batch"  => self.parse_batch()?,
             "let"    => self.parse_let()?,
             other    => return Err(ParseError::UnknownForm(other.to_string())),
         };
@@ -275,6 +280,61 @@ impl Parser {
         Ok(Expr::Threshold(t, Box::new(child)))
     }
 
+    /// Parse batch: (batch {:top 30} :label1 expr1 :label2 expr2 ...)
+    /// Optional {opts} block applies filters to every entry.
+    fn parse_batch(&mut self) -> Result<Expr, ParseError> {
+        let opts = if self.peek() == Some(&Token::BraceOpen) {
+            self.parse_batch_opts()?
+        } else {
+            BatchOpts::default()
+        };
+        let mut entries = Vec::new();
+        while self.peek() != Some(&Token::Close) {
+            let label = match self.next()? {
+                Token::Keyword(kw) => kw,
+                _ => return Err(ParseError::Other(
+                    format!("expected :label in batch at position {}", self.pos - 1),
+                )),
+            };
+            let expr = apply_batch_opts(self.parse_expr()?, &opts);
+            entries.push(BatchEntry { label, expr });
+        }
+        if entries.is_empty() {
+            return Err(ParseError::Other("batch requires at least one :label expr pair".into()));
+        }
+        Ok(Expr::Batch(entries))
+    }
+
+    fn parse_batch_opts(&mut self) -> Result<BatchOpts, ParseError> {
+        self.next()?; // consume {
+        let mut opts = BatchOpts::default();
+        while self.peek() != Some(&Token::BraceClose) {
+            let kw = match self.next()? {
+                Token::Keyword(k) => k,
+                _ => return Err(ParseError::Other(
+                    format!("expected :keyword in batch opts at position {}", self.pos - 1),
+                )),
+            };
+            match kw.as_str() {
+                "top" => {
+                    opts.top = Some(match self.next()? {
+                        Token::Num(n) => n as usize,
+                        _ => return Err(ParseError::ExpectedNumber(self.pos - 1)),
+                    });
+                }
+                ">" => {
+                    opts.threshold = Some(match self.next()? {
+                        Token::Num(n) => n,
+                        _ => return Err(ParseError::ExpectedNumber(self.pos - 1)),
+                    });
+                }
+                other => return Err(ParseError::Other(format!("unknown batch option :{other}"))),
+            }
+        }
+        self.next()?; // consume }
+        Ok(opts)
+    }
+
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
         match self.next()? {
             Token::BracketOpen => {}
@@ -293,6 +353,18 @@ impl Parser {
         let body = self.parse_expr()?;
         Ok(Expr::Let(bindings, Box::new(body)))
     }
+}
+
+/// Desugar batch opts by wrapping expr in Top/Threshold.
+fn apply_batch_opts(expr: Expr, opts: &BatchOpts) -> Expr {
+    let mut e = expr;
+    if let Some(t) = opts.threshold {
+        e = Expr::Threshold(t, Box::new(e));
+    }
+    if let Some(k) = opts.top {
+        e = Expr::Top(k, Box::new(e));
+    }
+    e
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -414,4 +486,27 @@ mod tests {
         assert_eq!(expr, Expr::Threshold(0.5, Box::new(Expr::Rg("auth".into(), SearchOpts::default()))));
     }
 
+    #[test]
+    fn parse_batch() {
+        let expr = parse(r#"(batch :tasks (rg "TODO") :bugs (rg "FIXME"))"#).unwrap();
+        assert_eq!(expr, Expr::Batch(vec![
+            BatchEntry { label: "tasks".into(), expr: Expr::Rg("TODO".into(), SearchOpts::default()) },
+            BatchEntry { label: "bugs".into(), expr: Expr::Rg("FIXME".into(), SearchOpts::default()) },
+        ]));
+    }
+
+    #[test]
+    fn parse_batch_with_opts() {
+        let expr = parse(r#"(batch {:top 5} :a (rg "x") :b (rg "y"))"#).unwrap();
+        // Opts desugared: each entry wrapped in (top 5 ...)
+        assert_eq!(expr, Expr::Batch(vec![
+            BatchEntry { label: "a".into(), expr: Expr::Top(5, Box::new(Expr::Rg("x".into(), SearchOpts::default()))) },
+            BatchEntry { label: "b".into(), expr: Expr::Top(5, Box::new(Expr::Rg("y".into(), SearchOpts::default()))) },
+        ]));
+    }
+
+    #[test]
+    fn parse_batch_empty_errors() {
+        assert!(parse(r#"(batch)"#).is_err());
+    }
 }
