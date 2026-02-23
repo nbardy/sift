@@ -6,15 +6,15 @@ Sift is a tiny Lisp that composes search backends (ripgrep, BM25, embeddings) in
 
 The CLI command is `ag`.
 
-```lisp
-;; Find callers of eval, excluding its definition
-(- (rg "eval\\(") (rg "pub fn eval"))
+```bash
+# Find callers of eval, excluding its definition
+ag '(- (rg "eval\\(") (rg "pub fn eval"))'
 
-;; Blend three search methods, take top 10
-(top 10 (mix (sem "auth flow") (rg "authenticate") (lex "authentication")))
+# Blend three search methods, take top 10
+ag '(top 10 (mix (sem "auth flow") (rg "authenticate") (lex "authentication")))'
 
-;; Sequential pipeline: find files with structs, then search those for impls
-(pipe (rg "pub struct") (rg "impl"))
+# Sequential pipeline: find files with structs, then search those for impls
+ag '(pipe (rg "pub struct") (rg "impl"))'
 ```
 
 ## Why
@@ -32,17 +32,20 @@ Agents grep. Sometimes they grep well, sometimes they miss things. The gap betwe
 ## Install
 
 ```bash
-# Default (rg backend only, <2MB)
-cargo install --path .
+# From crates.io (default: rg backend only, <2MB)
+cargo install sift-search
 
 # With BM25 indexing
-cargo install --path . --features lex
+cargo install sift-search --features lex
 
 # With semantic embeddings
-cargo install --path . --features sem
+cargo install sift-search --features sem
 
 # Everything
-cargo install --path . --features full
+cargo install sift-search --features full
+
+# From source
+cargo install --path .
 ```
 
 Requires [ripgrep](https://github.com/BurntSushi/ripgrep): `brew install ripgrep`
@@ -170,8 +173,8 @@ After fusion, scores are **normalized to [0, 1]** by dividing by the maximum, so
 
 Every combinator (`&`, `|`, `mix`, `-`) spawns its children as concurrent tokio tasks via `futures::join_all`. A query like:
 
-```lisp
-(mix (rg "auth") (rg "login") (rg "session"))
+```bash
+ag '(mix (rg "auth") (rg "login") (rg "session"))'
 ```
 
 runs three ripgrep processes simultaneously. Total latency = slowest child, not the sum. This extends to nested expressions — the evaluator recurses into children in parallel at every level of the AST.
@@ -180,8 +183,8 @@ runs three ripgrep processes simultaneously. Total latency = slowest child, not 
 
 The `pipe` combinator provides tiered search — narrow first, refine second:
 
-```lisp
-(pipe (rg "pub struct") (rg "impl"))
+```bash
+ag '(pipe (rg "pub struct") (rg "impl"))'
 ```
 
 This evaluates the source (`rg "pub struct"`) first, extracts the set of matching files, then rewrites the target expression to scope its searches to only those files. This powers patterns like "find files about authentication, then search those for SQL queries."

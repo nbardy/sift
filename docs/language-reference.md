@@ -17,11 +17,11 @@ Three backends, each with different strengths. All accept optional keyword filte
 | `(lex "query")` | tantivy BM25 | Ranked text retrieval. Handles stemming, tokenization. Fast repeated queries. |
 | `(sem "query")` | ONNX embeddings | Conceptual similarity. Finds what you mean, not what you typed. |
 
-```lisp
-(rg "fn authenticate")
-(rg "TODO|FIXME|HACK" :lang "rust" :x "*test*")
-(lex "connection pool timeout" :lang "go")
-(sem "error handling and recovery" :in "src/")
+```bash
+ag '(rg "fn authenticate")'
+ag '(rg "TODO|FIXME|HACK" :lang "rust" :x "*test*")'
+ag '(lex "connection pool timeout" :lang "go")'
+ag '(sem "error handling and recovery" :in "src/")'
 ```
 
 ### Keyword Filters
@@ -37,8 +37,8 @@ Every search primitive accepts these optional filters:
 
 Multiple `:x` and `:i` can be stacked:
 
-```lisp
-(rg "TODO" :x "*test*" :x "*vendor*" :lang "rust")
+```bash
+ag '(rg "TODO" :x "*test*" :x "*vendor*" :lang "rust")'
 ```
 
 ### Language Names
@@ -55,27 +55,27 @@ All combinators that take multiple children fan them out as parallel async tasks
 
 Returns only hits present in **all** children. Scored by minimum score across inputs.
 
-```lisp
-;; Lines containing both "async" and "tokio"
-(& (rg "async") (rg "tokio"))
+```bash
+# Lines containing both "async" and "tokio"
+ag '(& (rg "async") (rg "tokio"))'
 
-;; Rust files about both authentication and database
-(& (sem "authentication" :lang "rust") (sem "database" :lang "rust"))
+# Rust files about both authentication and database
+ag '(& (sem "authentication" :lang "rust") (sem "database" :lang "rust"))'
 
-;; Three-way intersection
-(& (rg "pub fn") (rg "Result") (rg "async"))
+# Three-way intersection
+ag '(& (rg "pub fn") (rg "Result") (rg "async"))'
 ```
 
 ### Union: `|`
 
 Returns hits from **any** child. When a hit appears in multiple children, keeps the highest score.
 
-```lisp
-;; Error-like patterns from any source
-(| (rg "Error") (rg "panic") (rg "unwrap"))
+```bash
+# Error-like patterns from any source
+ag '(| (rg "Error") (rg "panic") (rg "unwrap"))'
 
-;; Find any kind of import
-(| (rg "use ") (rg "import ") (rg "require\\("))
+# Find any kind of import
+ag '(| (rg "use ") (rg "import ") (rg "require\\("))'
 ```
 
 ### Mix (RRF Fusion): `mix`
@@ -84,55 +84,55 @@ Blends results from multiple sources using Reciprocal Rank Fusion. This is the p
 
 **Equal weight** (default):
 
-```lisp
-;; Blend exact + semantic for code debt
-(mix (rg "TODO|FIXME|HACK") (sem "technical debt"))
+```bash
+# Blend exact + semantic for code debt
+ag '(mix (rg "TODO|FIXME|HACK") (sem "technical debt"))'
 
-;; Three-way blend: all backends
-(mix (rg "fn main") (lex "main entry point") (sem "program entry"))
+# Three-way blend: all backends
+ag '(mix (rg "fn main") (lex "main entry point") (sem "program entry"))'
 ```
 
 **Weighted blend** — pass weights in brackets. Weights are relative (don't need to sum to 1):
 
-```lisp
-;; Trust semantic more for conceptual queries
-(mix [0.7 0.3] (sem "retry with exponential backoff") (rg "retry|backoff"))
+```bash
+# Trust semantic more for conceptual queries
+ag '(mix [0.7 0.3] (sem "retry with exponential backoff") (rg "retry|backoff"))'
 
-;; Security audit: semantic leads, exact confirms
-(mix [0.4 0.3 0.3]
+# Security audit: semantic leads, exact confirms
+ag '(mix [0.4 0.3 0.3]
   (sem "credentials secrets" :x "*test*")
   (lex "password secret api_key" :x "*test*")
-  (rg "SECRET|TOKEN|API_KEY" :x "*test*"))
+  (rg "SECRET|TOKEN|API_KEY" :x "*test*"))'
 ```
 
 ### Difference: `-`
 
 Hits in the first expression that are **not** in the second. Matching is by file:line.
 
-```lisp
-;; Callers, excluding the definition
-(- (rg "authenticate\\(") (rg "fn authenticate"))
+```bash
+# Callers, excluding the definition
+ag '(- (rg "authenticate\\(") (rg "fn authenticate"))'
 
-;; Production code only (exclude tests)
-(- (rg "pub fn") (rg "#\\[test\\]"))
+# Production code only (exclude tests)
+ag '(- (rg "pub fn") (rg "#\\[test\\]"))'
 
-;; Find TODO/FIXME but not in vendor
-(- (rg "TODO|FIXME") (rg "vendor/"))
+# Find TODO/FIXME but not in vendor
+ag '(- (rg "TODO|FIXME") (rg "vendor/"))'
 ```
 
 ### Sequential Pipeline: `pipe`
 
 Evaluates the source expression first, extracts the set of matching **files**, then rewrites the target expression to scope all its searches to only those files. This enables tiered search: narrow first, refine second.
 
-```lisp
-;; Find files with structs, then search those for impl blocks
-(pipe (rg "pub struct") (rg "impl"))
+```bash
+# Find files with structs, then search those for impl blocks
+ag '(pipe (rg "pub struct") (rg "impl"))'
 
-;; Narrow to auth files, then look for SQL injection risks
-(pipe (rg "authenticate") (rg "SELECT|INSERT|UPDATE"))
+# Narrow to auth files, then look for SQL injection risks
+ag '(pipe (rg "authenticate") (rg "SELECT|INSERT|UPDATE"))'
 
-;; Concept-guided narrowing: semantic first, exact second
-(pipe (sem "database connection") (rg "pool|timeout"))
+# Concept-guided narrowing: semantic first, exact second
+ag '(pipe (sem "database connection") (rg "pool|timeout"))'
 ```
 
 ---
@@ -143,18 +143,18 @@ Evaluates the source expression first, extracts the set of matching **files**, t
 
 Keep only the top `k` results by score.
 
-```lisp
-(top 10 (rg "TODO"))
-(top 5 (mix (sem "auth") (rg "auth")))
+```bash
+ag '(top 10 (rg "TODO"))'
+ag '(top 5 (mix (sem "auth") (rg "auth")))'
 ```
 
 ### Score Threshold: `>`
 
 Keep only results with score >= threshold (0.0 to 1.0).
 
-```lisp
-(> 0.5 (mix (sem "error handling") (rg "catch|rescue")))
-(> 0.8 (sem "security vulnerability"))
+```bash
+ag '(> 0.5 (mix (sem "error handling") (rg "catch|rescue")))'
+ag '(> 0.8 (sem "security vulnerability"))'
 ```
 
 ---
@@ -163,27 +163,26 @@ Keep only results with score >= threshold (0.0 to 1.0).
 
 Name intermediate results to reuse them without re-executing.
 
-```lisp
-;; Name a result, then filter it
-(let [x (rg "TODO")]
-  (top 5 x))
+```bash
+# Name a result, then filter it
+ag '(let [x (rg "TODO")] (top 5 x))'
 
-;; Multiple bindings
-(let [auth  (rg "authenticate" :lang "rust")
-      tests (rg "test" :lang "rust")]
-  (- auth tests))
+# Multiple bindings
+ag '(let [auth  (rg "authenticate" :lang "rust")
+          tests (rg "test" :lang "rust")]
+  (- auth tests))'
 
-;; Complex composition
-(let [structs (rg "pub struct" :lang "rs")
-      impls   (rg "impl" :lang "rs")]
-  (top 20 (& structs impls)))
+# Complex composition
+ag '(let [structs (rg "pub struct" :lang "rs")
+          impls   (rg "impl" :lang "rs")]
+  (top 20 (& structs impls)))'
 ```
 
 ---
 
 ## CLI
 
-```
+```bash
 ag '(rg "TODO")'               # inline query
 ag "TODO"                       # auto mode — plain text wraps as (rg "TODO")
 ag -g "TODO"                    # grep shorthand
@@ -239,7 +238,7 @@ Clean up: `ag --index-clean`
 Every combinator fans out children as concurrent async tasks:
 
 ```
-(mix (rg "x") (lex "x") (sem "x"))
+ag '(mix (rg "x") (lex "x") (sem "x"))'
 
      mix
     / | \
@@ -251,7 +250,7 @@ Every combinator fans out children as concurrent async tasks:
 **Nested parallelism** composes naturally:
 
 ```
-(& (sem "auth") (| (rg "login") (lex "authenticate")))
+ag '(& (sem "auth") (| (rg "login") (lex "authenticate")))'
 
        &
       / \
@@ -263,7 +262,7 @@ Every combinator fans out children as concurrent async tasks:
 **Sequential pipelines** are the exception — source must complete before target starts:
 
 ```
-(pipe (rg "struct") (rg "impl"))
+ag '(pipe (rg "struct") (rg "impl"))'
 
   rg "struct"     <- phase 1: find files
       |
@@ -276,64 +275,64 @@ Every combinator fans out children as concurrent async tasks:
 
 ### Finding Related Code
 
-```lisp
-;; Definition and all callers
-(| (rg "fn handle_request") (rg "handle_request\\("))
+```bash
+# Definition and all callers
+ag '(| (rg "fn handle_request") (rg "handle_request\\("))'
 
-;; All callers excluding definition
-(- (rg "handle_request\\(") (rg "fn handle_request"))
+# All callers excluding definition
+ag '(- (rg "handle_request\\(") (rg "fn handle_request"))'
 ```
 
 ### Multi-Signal Search
 
-```lisp
-;; Blend exact + semantic when you sort-of know the term
-(mix (rg "retry|backoff|exponential") (sem "retry with exponential backoff"))
+```bash
+# Blend exact + semantic when you sort-of know the term
+ag '(mix (rg "retry|backoff|exponential") (sem "retry with exponential backoff"))'
 
-;; All three backends for maximum recall
-(top 15 (mix (sem "database migration") (lex "migrate schema") (rg "migrate|migration")))
+# All three backends for maximum recall
+ag '(top 15 (mix (sem "database migration") (lex "migrate schema") (rg "migrate|migration")))'
 ```
 
 ### Scoped Exploration
 
-```lisp
-;; Find auth-related files, then look for potential issues
-(pipe (sem "authentication authorization") (rg "TODO|FIXME|HACK|unsafe"))
+```bash
+# Find auth-related files, then look for potential issues
+ag '(pipe (sem "authentication authorization") (rg "TODO|FIXME|HACK|unsafe"))'
 
-;; Narrow to error handling, then find unhandled cases
-(pipe (rg "Result<") (rg "unwrap\\(\\)"))
+# Narrow to error handling, then find unhandled cases
+ag '(pipe (rg "Result<") (rg "unwrap\\(\\)"))'
 ```
 
 ### Security Auditing
 
-```lisp
-;; Credentials in code (excluding test fixtures)
-(top 20 (mix [0.4 0.3 0.3]
+```bash
+# Credentials in code (excluding test fixtures)
+ag '(top 20 (mix [0.4 0.3 0.3]
   (sem "hardcoded credentials secrets" :x "*test*")
   (lex "password secret api_key token" :x "*test*")
-  (rg "SECRET|TOKEN|API_KEY|password" :x "*test*")))
+  (rg "SECRET|TOKEN|API_KEY|password" :x "*test*")))'
 
-;; SQL injection risks in auth code
-(pipe (sem "authentication") (rg "format!.*SELECT|format!.*INSERT"))
+# SQL injection risks in auth code
+ag '(pipe (sem "authentication") (rg "format!.*SELECT|format!.*INSERT"))'
 ```
 
 ### Refactoring Prep
 
-```lisp
-;; Find all usage of old API
-(let [usage (rg "old_client\\.request")]
-  (top 20 (& usage (sem "HTTP client usage"))))
+```bash
+# Find all usage of old API
+ag '(let [usage (rg "old_client\\.request")]
+  (top 20 (& usage (sem "HTTP client usage"))))'
 
-;; Struct definitions with their impl blocks
-(& (rg "pub struct") (rg "impl"))
+# Struct definitions with their impl blocks
+ag '(& (rg "pub struct") (rg "impl"))'
 ```
 
 ### Cross-Language Search
 
-```lisp
-;; Same concept across Rust and Python
-(| (sem "database connection" :lang "rust") (sem "database connection" :lang "python"))
+```bash
+# Same concept across Rust and Python
+ag '(| (sem "database connection" :lang "rust") (sem "database connection" :lang "python"))'
 
-;; Config files only
-(rg "database_url|DB_HOST" :lang "toml")
+# Config files only
+ag '(rg "database_url|DB_HOST" :lang "toml")'
 ```
