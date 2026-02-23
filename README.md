@@ -212,6 +212,13 @@ The `rg` backend runs ripgrep as a subprocess rather than linking it as a librar
 
 ripgrep returns matches in file order, not ranked by relevance. To make these results compatible with RRF (which needs ranks), hits are assigned **positional scores** — the first result gets score 1.0, linearly decreasing to 0.0 for the last. This preserves the "earlier matches are probably more relevant" heuristic from ripgrep's file-order traversal while giving RRF meaningful ranks to work with.
 
+## Activity
+
+![Commits per week](docs/charts/commits-per-week.svg)
+![Lines of code](docs/charts/loc-per-week.svg)
+
+Regenerate: `./scripts/charts.sh`
+
 ## Roadmap
 
 - [x] `rg` backend — exact grep, always fresh
