@@ -2,6 +2,12 @@
 
 A search DSL for agents. Compose, parallelize, and fuse code searches.
 
+```bash
+cargo install sift-search            # install
+ag '(rg "TODO")'                     # search
+ag '(& (rg "async") (rg "tokio"))'   # compose
+```
+
 Sift is a tiny Lisp that composes search backends (ripgrep, BM25, embeddings) into parallel pipelines. Instead of an agent making five sequential grep calls and merging results in application code, it writes one expression and gets back ranked, deduplicated, blended results — automatically parallelized across backends.
 
 The CLI command is `ag`.
