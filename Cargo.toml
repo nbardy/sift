@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Sift — a DSL for agents to search codebases in faster, deeper, and more sophisticated ways"
+repository = "https://github.com/nbardy/sift"
+homepage = "https://github.com/nbardy/sift"
+keywords = ["search", "code-search", "ripgrep", "embeddings", "agents"]
+categories = ["command-line-utilities", "development-tools", "text-processing"]
 
 [[bin]]
 name = "ag"
